@@ -93,12 +93,13 @@ rec {
     in
       assert valueCheckers.isNonEmptyString executable;
       assert builtins.isList deps;
+      assert builtins.all pkgs.lib.isDerivation deps;
       assert builtins.isAttrs env;
       assert builtins.isList args;
       assert valueCheckers.isNonEmptyString nameWithoutContext;
       assert builtins.all isValidEnvVarName (builtins.attrNames env);
-
-      writeCheckedExecutable nameWithoutContext ''
+    let
+      newExecutable = writeCheckedExecutable nameWithoutContext ''
         ${shellCheckers.fileIsExecutable dash}
         ${shellCheckers.fileIsExecutable executable}
         ${checkPhase}
@@ -106,4 +107,7 @@ rec {
         #! ${dash}
         ${preList " " envVarsList}${esc executable} ${preList " " (map esc args)}"$@"
       '';
+    in
+      assert pkgs.lib.isDerivation newExecutable;
+      newExecutable;
 }
