@@ -2,10 +2,17 @@
 # Author: Viacheslav Lotsmanov, 2020
 { pkgs ? import <nixpkgs> {}
 }:
-rec {
-  esc = pkgs.lib.escapeShellArg;
+let
   lines = str: builtins.filter builtins.isString (builtins.split "\n" str);
   unlines = builtins.concatStringsSep "\n";
+in
+assert lines "foo" == ["foo"];
+assert unlines ["foo"] == "foo";
+assert let x = "foo\nbar\nbaz";   in unlines (lines x) == x;
+assert let x = "foo\nbar\nbaz\n"; in unlines (lines x) == x;
+rec {
+  esc = pkgs.lib.escapeShellArg;
+  inherit lines unlines;
 
   # to get module file path use this hack: (builtins.unsafeGetAttrPos "a" { a = 0; }).file
   nameOfModuleWrapDir = moduleFilePath: baseNameOf (dirOf moduleFilePath);
