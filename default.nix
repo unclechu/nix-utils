@@ -1,5 +1,5 @@
 # My own utils for Nix programming language.
-# Author: Viacheslav Lotsmanov, 2020
+# Author: Viacheslav Lotsmanov, 2020–2021
 { pkgs ? import <nixpkgs> {}
 }:
 let
@@ -112,7 +112,7 @@ rec {
         ${checkPhase}
       '' ''
         #! ${dash}
-        ${preList " " envVarsList}${esc executable} ${preList " " (map esc args)}"$@"
+        ${preList " " envVarsList}exec ${esc executable} ${preList " " (map esc args)}"$@"
       '';
     in
       assert pkgs.lib.isDerivation newExecutable;
