@@ -23,12 +23,16 @@ rec {
     in  builtins.substring 0 (builtins.stringLength file - (builtins.stringLength ".nix")) file;
 
   # a helper to create a new script with a "checkPhase" for it
-  writeCheckedExecutable = name: checkPhase: text: pkgs.writeTextFile {
-    inherit name text;
-    executable = true;
-    destination = "/bin/${name}";
-    checkPhase = "set -Eeuo pipefail\n${checkPhase}";
-  };
+  writeCheckedExecutable = name: checkPhase: text:
+    assert valueCheckers.isNonEmptyString name;
+    assert builtins.isString checkPhase;
+    assert valueCheckers.isNonEmptyString text;
+    pkgs.writeTextFile {
+      inherit name text;
+      executable = true;
+      destination = "/bin/${name}";
+      checkPhase = "set -Eeuo pipefail\n${checkPhase}";
+    };
 
   # helpers for "checkPhase"
   shellCheckers = {
@@ -105,6 +109,7 @@ rec {
       assert builtins.isList args;
       assert valueCheckers.isNonEmptyString nameWithoutContext;
       assert builtins.all isValidEnvVarName (builtins.attrNames env);
+      assert builtins.isString checkPhase;
     let
       newExecutable = writeCheckedExecutable nameWithoutContext ''
         ${shellCheckers.fileIsExecutable dash}
@@ -117,4 +122,35 @@ rec {
     in
       assert pkgs.lib.isDerivation newExecutable;
       newExecutable;
+
+  # Wraps an executable providing some Perl 5 dependencies for that executable.
+  # Overrides “PERL5LIB” environment variable (it’s uncomposable at the moment).
+  # Usage example:
+  #
+  #   let
+  #     pkgs = import <nixpkgs> {};
+  #     utils = import /path/to/nix-utils { inherit pkgs; };
+  #     name = "some-perl-script";
+  #     perl = "${pkgs.perl}/bin/perl";
+  #     checkPhase = utils.shellCheckers.fileIsExecutable perl;
+  #     deps = perlPackages: [ perlPackages.IPCSystemSimple ];
+  #
+  #     perlScript = writeCheckedExecutable name checkPhase ''
+  #       #! ${perl}
+  #       # Some perl script…
+  #     '';
+  #   in
+  #     wrapExecutableWithPerlDeps "${perlScript}/bin/${name}" { inherit deps; }
+  #
+  wrapExecutableWithPerlDeps = executable: { deps, checkPhase ? "" }:
+    assert valueCheckers.isNonEmptyString executable;
+    assert builtins.isString checkPhase;
+    assert builtins.isFunction deps;
+    let depsList = deps pkgs.perlPackages; in
+    assert builtins.isList depsList;
+    assert builtins.all pkgs.lib.isDerivation depsList;
+    wrapExecutable executable {
+      env = { PERL5LIB = pkgs.perlPackages.makePerlPath depsList; };
+      inherit checkPhase;
+    };
 }
