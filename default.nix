@@ -1,5 +1,9 @@
 # My own utils for Nix programming language.
 # Author: Viacheslav Lotsmanov, 2020–2021
+
+# TODO Customizable derivation name for ‘wrapExecutable’
+# TODO Redirection of stdin/stdout/stderr for ‘wrapExecutable’
+
 { pkgs ? import <nixpkgs> {}
 }:
 let
