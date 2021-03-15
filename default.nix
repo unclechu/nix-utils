@@ -1,5 +1,6 @@
 # My own utils for Nix programming language.
 # Author: Viacheslav Lotsmanov, 2020–2021
+# License: MIT https://raw.githubusercontent.com/unclechu/nix-utils/master/LICENSE
 
 # TODO Customizable derivation name for ‘wrapExecutable’
 # TODO Redirection of stdin/stdout/stderr for ‘wrapExecutable’
