@@ -5,8 +5,17 @@
 # TODO Customizable derivation name for ‘wrapExecutable’
 # TODO Redirection of stdin/stdout/stderr for ‘wrapExecutable’
 
-{ pkgs ? import <nixpkgs> {}
-}:
+# The easiest way to import this module is by using ‘nixpkgs.callPackage’, an example:
+/*
+  (import <nixpkgs> {}).callPackage (fetchTarball {
+    url = "https://github.com/unclechu/nix-utils/archive/master.tar.gz";
+  }) {}
+*/
+# Or from the directory where this file is:
+/*
+  (import <nixpkgs> {}).callPackage ./. {}
+*/
+{ lib, writeTextFile, dash, perlPackages }:
 let
   lines = str: builtins.filter builtins.isString (builtins.split "\n" str);
   unlines = builtins.concatStringsSep "\n";
@@ -16,7 +25,7 @@ assert unlines ["foo"] == "foo";
 assert let x = "foo\nbar\nbaz";   in unlines (lines x) == x;
 assert let x = "foo\nbar\nbaz\n"; in unlines (lines x) == x;
 rec {
-  esc = pkgs.lib.escapeShellArg;
+  esc = lib.escapeShellArg;
   inherit lines unlines;
 
   # to get module file path use this hack: (builtins.unsafeGetAttrPos "a" { a = 0; }).file
@@ -32,7 +41,7 @@ rec {
     assert valueCheckers.isNonEmptyString name;
     assert builtins.isString checkPhase;
     assert valueCheckers.isNonEmptyString text;
-    pkgs.writeTextFile {
+    writeTextFile {
       inherit name text;
       executable = true;
       destination = "/bin/${name}";
@@ -42,7 +51,7 @@ rec {
   # helpers for "checkPhase"
   shellCheckers = {
     fileIsExecutable = file:
-      assert builtins.isString file || pkgs.lib.isDerivation file;
+      assert builtins.isString file || lib.isDerivation file;
       assert valueCheckers.isNonEmptyString "${file}";
       ''
         if ! [ -f ${esc file} -a -r ${esc file} -a -x ${esc file} ]; then
@@ -53,7 +62,7 @@ rec {
       '';
 
     fileIsReadable = file:
-      assert builtins.isString file || pkgs.lib.isDerivation file;
+      assert builtins.isString file || lib.isDerivation file;
       assert valueCheckers.isNonEmptyString "${file}";
       ''
         if ! [ -f ${esc file} -a -r ${esc file} ]; then
@@ -79,7 +88,7 @@ rec {
     , checkPhase ? ""
     }:
     let
-      dash = "${pkgs.dash}/bin/dash";
+      dash-exe = "${dash}/bin/dash";
 
       # extracting the name of an executable inherits StringContext of a derivation
       # which isn't allowed for a name of new executable. but since we're using
@@ -104,12 +113,12 @@ rec {
           if isNull valueToExtend then null else "${depsToAdd}${valueToExtend}";
 
       envVarsList =
-        pkgs.lib.mapAttrsToList (k: v: "${k}=${esc v}") (builtins.removeAttrs env [PATH]) ++
+        lib.mapAttrsToList (k: v: "${k}=${esc v}") (builtins.removeAttrs env [PATH]) ++
         (if isNull newPath then [] else ["${PATH}=${newPath}"]);
     in
       assert valueCheckers.isNonEmptyString executable;
       assert builtins.isList deps;
-      assert builtins.all pkgs.lib.isDerivation deps;
+      assert builtins.all lib.isDerivation deps;
       assert builtins.isAttrs env;
       assert builtins.isList args;
       assert valueCheckers.isNonEmptyString nameWithoutContext;
@@ -117,15 +126,15 @@ rec {
       assert builtins.isString checkPhase;
     let
       newExecutable = writeCheckedExecutable nameWithoutContext ''
-        ${shellCheckers.fileIsExecutable dash}
+        ${shellCheckers.fileIsExecutable dash-exe}
         ${shellCheckers.fileIsExecutable executable}
         ${checkPhase}
       '' ''
-        #! ${dash}
+        #! ${dash-exe}
         ${preList " " envVarsList}exec ${esc executable} ${preList " " (map esc args)}"$@"
       '';
     in
-      assert pkgs.lib.isDerivation newExecutable;
+      assert lib.isDerivation newExecutable;
       newExecutable;
 
   # Wraps an executable providing some Perl 5 dependencies for that executable.
@@ -134,28 +143,28 @@ rec {
   #
   #   let
   #     pkgs = import <nixpkgs> {};
-  #     utils = import /path/to/nix-utils { inherit pkgs; };
+  #     utils = pkgs.callPackage /path/to/nix-utils {};
   #     name = "some-perl-script";
   #     perl = "${pkgs.perl}/bin/perl";
   #     checkPhase = utils.shellCheckers.fileIsExecutable perl;
   #     deps = perlPackages: [ perlPackages.IPCSystemSimple ];
   #
-  #     perlScript = writeCheckedExecutable name checkPhase ''
+  #     perlScript = utils.writeCheckedExecutable name checkPhase ''
   #       #! ${perl}
   #       # Some perl script…
   #     '';
   #   in
-  #     wrapExecutableWithPerlDeps "${perlScript}/bin/${name}" { inherit deps; }
+  #     utils.wrapExecutableWithPerlDeps "${perlScript}/bin/${name}" { inherit deps; }
   #
   wrapExecutableWithPerlDeps = executable: { deps, checkPhase ? "" }:
     assert valueCheckers.isNonEmptyString executable;
     assert builtins.isString checkPhase;
     assert builtins.isFunction deps;
-    let depsList = deps pkgs.perlPackages; in
+    let depsList = deps perlPackages; in
     assert builtins.isList depsList;
-    assert builtins.all pkgs.lib.isDerivation depsList;
+    assert builtins.all lib.isDerivation depsList;
     wrapExecutable executable {
-      env = { PERL5LIB = pkgs.perlPackages.makePerlPath depsList; };
+      env = { PERL5LIB = perlPackages.makePerlPath depsList; };
       inherit checkPhase;
     };
 }
