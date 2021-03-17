@@ -45,7 +45,7 @@ rec {
       inherit name text;
       executable = true;
       destination = "/bin/${name}";
-      checkPhase = "set -Eeuo pipefail\n${checkPhase}";
+      checkPhase = "set -Eeuo pipefail || exit\n${checkPhase}";
     };
 
   # helpers for "checkPhase"
