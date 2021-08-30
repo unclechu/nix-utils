@@ -4,6 +4,9 @@
 
 # TODO Customizable derivation name for ‘wrapExecutable’
 # TODO Redirection of stdin/stdout/stderr for ‘wrapExecutable’
+# TODO Normal dependencies for ‘wrapExecutableWithPerlDeps’
+# TODO Export ‘perlDependencies’ from ‘wrapExecutableWithPerlDeps’
+# TODO Shell checker for a directory
 
 # The easiest way to import this module is by using ‘nixpkgs.callPackage’, an example:
 /*
@@ -16,17 +19,8 @@
   (import <nixpkgs> {}).callPackage ./. {}
 */
 { lib, writeTextFile, dash, perlPackages }:
-let
-  lines = str: builtins.filter builtins.isString (builtins.split "\n" str);
-  unlines = builtins.concatStringsSep "\n";
-in
-assert lines "foo" == ["foo"];
-assert unlines ["foo"] == "foo";
-assert let x = "foo\nbar\nbaz";   in unlines (lines x) == x;
-assert let x = "foo\nbar\nbaz\n"; in unlines (lines x) == x;
 rec {
   esc = lib.escapeShellArg;
-  inherit lines unlines;
 
   # to get module file path use this hack: (builtins.unsafeGetAttrPos "a" { a = 0; }).file
   nameOfModuleWrapDir = moduleFilePath: baseNameOf (dirOf moduleFilePath);
@@ -167,4 +161,22 @@ rec {
       env = { PERL5LIB = perlPackages.makePerlPath depsList; };
       inherit checkPhase;
     };
+
+  # Take a string, split it into a list of lines, apply provided callback function to the list,
+  # take resulting list of lines and concatenate those lines back to a single string preserving the
+  # string context.
+  #
+  # Mind that “builtins.split” drops all string context from the provided string.
+  # This function helps to avoid mistakes based on this fact.
+  # See also https://github.com/NixOS/nix/issues/2547
+  #
+  # String -> ([String] -> [String]) -> String
+  mapStringAsLines = srcString: mapLines:
+    lib.pipe srcString [
+      (builtins.split "\n")
+      (builtins.filter builtins.isString)
+      mapLines
+      (builtins.concatStringsSep "\n")
+      (lib.flip builtins.appendContext (builtins.getContext srcString))
+    ];
 }
